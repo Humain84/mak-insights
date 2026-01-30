@@ -46,3 +46,9 @@ export interface StrategicDossiers {
   oppsThreats: string;
   actNow: string[];
 }
+
+export interface ColumnSummary {
+  keyThemes: string[];
+  summary: string;
+  insights: string[];
+}

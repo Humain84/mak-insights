@@ -3,7 +3,12 @@ export interface SheetRow {
   [key: string]: string;
 }
 
-export const fetchSheetData = async (spreadsheetId: string, sheetName: string = 'Sheet1'): Promise<SheetRow[]> => {
+export interface SheetData {
+  rows: SheetRow[];
+  columnNames: string[];
+}
+
+export const fetchSheetData = async (spreadsheetId: string, sheetName: string = 'Sheet1'): Promise<SheetData> => {
   // Clean the spreadsheet ID (remove any extra characters)
   const cleanId = spreadsheetId.trim();
   
@@ -104,7 +109,7 @@ export const fetchSheetData = async (spreadsheetId: string, sheetName: string = 
       throw new Error(`Sheet "${sheetName}" is empty or only has headers. Please ensure the sheet contains data rows.`);
     }
     
-    return rows;
+    return { rows, columnNames: cols };
   } catch (error) {
     // If it's already our custom error, re-throw it
     if (error instanceof Error && (error.message.includes('Spreadsheet') || error.message.includes('sheet'))) {

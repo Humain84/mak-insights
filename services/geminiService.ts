@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { ReportType, AnalysisResult, MetaAnalysis, StrategicDossiers } from "../types";
+import { ReportType, AnalysisResult, MetaAnalysis, StrategicDossiers, ColumnSummary } from "../types";
+import { SheetRow } from "./googleSheetsService";
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
@@ -116,4 +117,54 @@ export const generateMetaAnalysis = async (reports: AnalysisResult[], userPrompt
   });
 
   return JSON.parse(response.text || '{"topFeatures": [], "executiveNarrative": ""}');
+};
+
+export const generateColumnSummary = async (
+  rows: SheetRow[], 
+  columnIndices: number[],
+  columnNames: string[]
+): Promise<ColumnSummary> => {
+  if (rows.length === 0) {
+    return { keyThemes: [], summary: "No data available.", insights: [] };
+  }
+
+  // Extract data from specified columns (C=2, D=3, F=5, G=6)
+  const selectedColumnNames = columnIndices.map(idx => columnNames[idx] || `Column ${String.fromCharCode(65 + idx)}`);
+  
+  const columnData = rows.map((row, rowIndex) => {
+    const rowData: { [key: string]: string } = {};
+    columnIndices.forEach((colIndex) => {
+      const colName = columnNames[colIndex] || `Column ${String.fromCharCode(65 + colIndex)}`;
+      // Access the row by column name (SheetRow is a dictionary with column names as keys)
+      const cellValue = row[colName] || '';
+      rowData[colName] = cellValue;
+    });
+    return `Row ${rowIndex + 1}:\n${Object.entries(rowData).map(([key, value]) => `${key}: ${value}`).join('\n')}`;
+  }).join('\n\n');
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-pro-preview",
+    contents: `Analyze the following data from columns ${selectedColumnNames.join(', ')} (columns C, D, F, G) and identify key themes, patterns, and insights across all ${rows.length} rows:\n\n${columnData}\n\nProvide a comprehensive analysis focusing on:\n1. Key themes that emerge across the data\n2. A high-level summary of the overall patterns\n3. Actionable insights that can be derived from this data`,
+    config: {
+      systemInstruction: "You are a Chief Product Officer. Analyze patterns and high level themes to provide a summary of the feedback.",
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          keyThemes: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          summary: { type: Type.STRING },
+          insights: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["keyThemes", "summary", "insights"]
+      }
+    }
+  });
+
+  return JSON.parse(response.text || '{"keyThemes": [], "summary": "", "insights": []}');
 };

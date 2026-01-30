@@ -1,7 +1,8 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { AnalysisResult, SheetConfig, MetaAnalysis } from '../types';
-import { generateMetaAnalysis } from '../services/geminiService';
+import { AnalysisResult, SheetConfig, MetaAnalysis, ColumnSummary } from '../types';
+import { generateMetaAnalysis, generateColumnSummary } from '../services/geminiService';
+import { SheetRow } from '../services/googleSheetsService';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -15,12 +16,35 @@ interface DashboardProps {
   onUpdatePrompt: (prompt: string) => void;
   onSync: () => void;
   isSyncing: boolean;
+  columnNames: string[];
+  rawSheetRows: SheetRow[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt, onSync, isSyncing }) => {
+const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt, onSync, isSyncing, columnNames, rawSheetRows }) => {
   const [analysis, setAnalysis] = useState<MetaAnalysis | null>(null);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
   const [localPrompt, setLocalPrompt] = useState(sheetConfig.analysisPrompt || '');
+  const [columnSummary, setColumnSummary] = useState<ColumnSummary | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+
+  // Generate column summary for columns C, D, F, G (indices 2, 3, 5, 6)
+  useEffect(() => {
+    const generateSummary = async () => {
+      if (rawSheetRows.length > 0 && columnNames.length > 6) {
+        setIsGeneratingSummary(true);
+        try {
+          const columnIndices = [2, 3, 5, 6]; // C, D, F, G
+          const result = await generateColumnSummary(rawSheetRows, columnIndices, columnNames);
+          setColumnSummary(result);
+        } catch (error) {
+          console.error('Error generating column summary:', error);
+        } finally {
+          setIsGeneratingSummary(false);
+        }
+      }
+    };
+    generateSummary();
+  }, [rawSheetRows, columnNames]);
 
   useEffect(() => {
     const runGlobalAnalysis = async () => {
@@ -87,6 +111,59 @@ const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt
 
   return (
     <div className="space-y-6">
+      {/* High-Level Overview - Column Summary */}
+      {columnSummary && (
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[2.5rem] p-10 border border-blue-200 shadow-xl">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-3xl">📊</span>
+            <h2 className="text-2xl font-black text-slate-900">High-Level Overview</h2>
+            <span className="text-xs font-bold text-blue-600 bg-blue-100 px-3 py-1 rounded-full">
+              Columns C, D, F, G
+            </span>
+          </div>
+          
+          {isGeneratingSummary ? (
+            <div className="flex items-center gap-3 text-slate-600">
+              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium">Analyzing key themes...</span>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-3">Summary</h3>
+                <p className="text-slate-700 leading-relaxed">{columnSummary.summary}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-3">Key Themes</h3>
+                  <ul className="space-y-2">
+                    {columnSummary.keyThemes.map((theme, i) => (
+                      <li key={i} className="flex items-start gap-2 text-slate-700">
+                        <span className="text-blue-600 mt-1">•</span>
+                        <span>{theme}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-3">Insights</h3>
+                  <ul className="space-y-2">
+                    {columnSummary.insights.map((insight, i) => (
+                      <li key={i} className="flex items-start gap-2 text-slate-700">
+                        <span className="text-indigo-600 mt-1">→</span>
+                        <span>{insight}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl border border-slate-800">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-6">

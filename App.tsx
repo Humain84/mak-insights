@@ -6,7 +6,7 @@ import Integrations from './components/Integrations';
 import Ingest from './components/Ingest';
 import { AnalysisResult, SheetConfig, ReportType } from './types';
 import { analyzeTranscript } from './services/geminiService';
-import { fetchSheetData } from './services/googleSheetsService';
+import { fetchSheetData, SheetRow } from './services/googleSheetsService';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,6 +17,8 @@ const App: React.FC = () => {
     isConnected: false
   });
   const [isSyncing, setIsSyncing] = useState(false);
+  const [columnNames, setColumnNames] = useState<string[]>([]);
+  const [rawSheetRows, setRawSheetRows] = useState<any[]>([]);
 
   // Load config from localStorage on mount
   useEffect(() => {
@@ -55,7 +57,12 @@ const App: React.FC = () => {
 
     setIsSyncing(true);
     try {
-      const rows = await fetchSheetData(sheetConfig.spreadsheetId, sheetConfig.sheetName);
+      const sheetData = await fetchSheetData(sheetConfig.spreadsheetId, sheetConfig.sheetName);
+      const { rows, columnNames: cols } = sheetData;
+      
+      // Store column names and raw rows for column summary feature
+      setColumnNames(cols);
+      setRawSheetRows(rows);
       
       // Analyze each row that has transcript data
       const newReports: AnalysisResult[] = [];
@@ -107,6 +114,8 @@ const App: React.FC = () => {
             onUpdatePrompt={handleUpdatePrompt}
             onSync={handleSync}
             isSyncing={isSyncing}
+            columnNames={columnNames}
+            rawSheetRows={rawSheetRows}
           />
         );
       case 'reports':
@@ -123,6 +132,8 @@ const App: React.FC = () => {
             onUpdatePrompt={handleUpdatePrompt}
             onSync={handleSync}
             isSyncing={isSyncing}
+            columnNames={columnNames}
+            rawSheetRows={rawSheetRows}
           />
         );
     }
