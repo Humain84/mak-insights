@@ -1,0 +1,9 @@
+
+{
+  "name": "Mak Insights",
+  "description": "An AI-powered analytics platform that ingests customer feedback spreadsheets to generate real-time quantitative metrics and qualitative strategic dossiers.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
