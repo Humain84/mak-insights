@@ -58,8 +58,29 @@ const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt
       <div className="flex flex-col items-center justify-center h-[70vh]">
         <div className="text-8xl mb-6">🛰️</div>
         <h2 className="text-2xl font-black text-slate-900 mb-2">Awaiting Data Feed</h2>
-        <p className="text-slate-500 mb-8">Connect your workspace spreadsheet to begin analysis.</p>
-        <button onClick={() => window.location.hash = 'integrations'} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-xl">Integrations</button>
+        <p className="text-slate-500 mb-8">
+          {sheetConfig.isConnected 
+            ? "Click Sync to load data from your connected spreadsheet." 
+            : "Connect your workspace spreadsheet to begin analysis."}
+        </p>
+        <div className="flex gap-4">
+          {sheetConfig.isConnected ? (
+            <button 
+              onClick={onSync} 
+              disabled={isSyncing}
+              className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-xl hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSyncing ? 'Syncing...' : '🔄 Sync Data'}
+            </button>
+          ) : (
+            <button 
+              onClick={() => window.location.hash = 'integrations'} 
+              className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-bold shadow-xl"
+            >
+              Integrations
+            </button>
+          )}
+        </div>
       </div>
     );
   }
