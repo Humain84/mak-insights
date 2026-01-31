@@ -66,6 +66,28 @@ const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt
 
   return (
     <div className="space-y-6">
+      {/* Sync Button Header */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-black text-slate-900">Dashboard</h1>
+        <button
+          onClick={onSync}
+          disabled={isSyncing}
+          className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
+        >
+          {isSyncing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <span>Syncing...</span>
+            </>
+          ) : (
+            <>
+              <span>🔄</span>
+              <span>Sync Data</span>
+            </>
+          )}
+        </button>
+      </div>
+
       <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl border border-slate-800">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-6">
