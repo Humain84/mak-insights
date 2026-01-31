@@ -1,6 +1,6 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { ReportType, AnalysisResult, MetaAnalysis, StrategicDossiers } from "../types";
+import { SheetRow } from "./googleSheetsService";
 
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_API_KEY });
 
@@ -116,4 +116,99 @@ export const generateMetaAnalysis = async (reports: AnalysisResult[], userPrompt
   });
 
   return JSON.parse(response.text || '{"topFeatures": [], "executiveNarrative": ""}');
+};
+
+export const generateCustomerInsightSummaries = async (sheetRows: SheetRow[]): Promise<{
+  overall: string;
+  strengths: string;
+  weaknesses: string;
+  opportunities: string;
+  threats: string;
+  features_requested: string;
+}> => {
+  if (sheetRows.length === 0) {
+    return {
+      overall: 'No customer data available.',
+      strengths: 'No data.',
+      weaknesses: 'No data.',
+      opportunities: 'No data.',
+      threats: 'No data.',
+      features_requested: 'No data.'
+    };
+  }
+
+  const customerCount = sheetRows.length;
+
+  // Generate summaries for each category
+  const categories = [
+    { key: 'strengths', name: 'Strengths' },
+    { key: 'weaknesses', name: 'Weaknesses' },
+    { key: 'opportunities', name: 'Opportunities' },
+    { key: 'threats', name: 'Threats' },
+    { key: 'features_requested', name: 'Features Requested' }
+  ];
+
+  const summaries: any = {};
+
+  // Generate category summaries
+  for (const category of categories) {
+    const allResponses = sheetRows
+      .map((row, i) => `Customer ${i + 1}: ${row[category.key] || 'No data'}`)
+      .join('\n');
+
+    const prompt = `You are analysing customer feedback about Mak, an AI-powered HR platform.
+
+Below are responses from ${customerCount} customers about ${category.name}.
+
+Identify the 3-5 key themes. Note how frequently each theme appears (e.g., "mentioned by X customers"). Highlight any standout insights. Keep it under 150 words. Be specific and actionable.
+
+${allResponses}
+
+Provide a clear, concise summary:`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash-exp",
+      contents: prompt,
+      config: {
+        systemInstruction: "You are a product analyst. Extract themes and patterns from customer feedback."
+      }
+    });
+
+    summaries[category.key] = response.text || 'No summary generated.';
+  }
+
+  // Generate overall summary
+  let fullContext = `Customer feedback analysis for Mak (AI-powered HR platform) from ${customerCount} customers:\n\n`;
+
+  sheetRows.forEach((row, index) => {
+    fullContext += `CUSTOMER ${index + 1}:\n`;
+    fullContext += `Strengths: ${row.strengths || 'N/A'}\n`;
+    fullContext += `Weaknesses: ${row.weaknesses || 'N/A'}\n`;
+    fullContext += `Opportunities: ${row.opportunities || 'N/A'}\n`;
+    fullContext += `Threats: ${row.threats || 'N/A'}\n`;
+    fullContext += `Features Requested: ${row.features_requested || 'N/A'}\n`;
+    fullContext += `Overall Sentiment: ${row.overall_sentiment || 'N/A'}\n\n`;
+  });
+
+  const overallPrompt = `${fullContext}
+
+Provide a concise executive summary (200-250 words) of the key insights across all categories. Focus on:
+1. The most critical patterns and themes
+2. Top priorities for product development
+3. Relationship health and retention risks
+4. Strategic opportunities
+
+Be specific and actionable:`;
+
+  const overallResponse = await ai.models.generateContent({
+    model: "gemini-2.0-flash-exp",
+    contents: overallPrompt,
+    config: {
+      systemInstruction: "You are a Chief Product Officer synthesising customer intelligence."
+    }
+  });
+
+  summaries.overall = overallResponse.text || 'No overall summary generated.';
+
+  return summaries;
 };

@@ -1,59 +1,22 @@
+import React from 'react';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { AnalysisResult, SheetConfig, MetaAnalysis } from '../types';
-import { generateMetaAnalysis } from '../services/geminiService';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell 
-} from 'recharts';
-
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
-interface DashboardProps {
-  data: AnalysisResult[];
-  sheetConfig: SheetConfig;
-  onUpdatePrompt: (prompt: string) => void;
-  onSync: () => void;
-  isSyncing: boolean;
+interface CustomerSummaries {
+  overall: string;
+  strengths: string;
+  weaknesses: string;
+  opportunities: string;
+  threats: string;
+  features_requested: string;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt, onSync, isSyncing }) => {
-  const [analysis, setAnalysis] = useState<MetaAnalysis | null>(null);
-  const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [localPrompt, setLocalPrompt] = useState(sheetConfig.analysisPrompt || '');
+interface DashboardProps {
+  onSync: () => void;
+  isSyncing: boolean;
+  customerSummaries: CustomerSummaries | null;
+}
 
-  useEffect(() => {
-    const runGlobalAnalysis = async () => {
-      if (data.length > 0) {
-        setIsSynthesizing(true);
-        try {
-          const result = await generateMetaAnalysis(data, sheetConfig.analysisPrompt);
-          setAnalysis(result);
-        } catch (error) {
-          console.error(error);
-        } finally {
-          setIsSynthesizing(false);
-        }
-      }
-    };
-    runGlobalAnalysis();
-  }, [data, sheetConfig.analysisPrompt]);
-
-  const stats = useMemo(() => {
-    if (data.length === 0) return null;
-    const avgSent = data.reduce((acc, c) => acc + c.metrics.customerSentiment, 0) / data.length;
-    const totalValue = data.reduce((acc, c) => acc + (c.metrics.dealSizeEstimate || 0), 0);
-    const avgRisk = data.reduce((acc, c) => acc + c.metrics.churnRisk, 0) / data.length;
-    
-    const pieData = Object.entries(data.reduce((acc, c) => {
-      acc[c.type] = (acc[c.type] || 0) + 1;
-      return acc;
-    }, {} as any)).map(([name, value]) => ({ name, value }));
-
-    return { avgSent: avgSent.toFixed(1), totalValue, avgRisk: avgRisk.toFixed(1), pieData };
-  }, [data]);
-
-  if (data.length === 0) {
+const Dashboard: React.FC<DashboardProps> = ({ onSync, isSyncing, customerSummaries }) => {
+  if (!customerSummaries) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh]">
         <div className="text-8xl mb-6">🛰️</div>
@@ -88,87 +51,70 @@ const Dashboard: React.FC<DashboardProps> = ({ data, sheetConfig, onUpdatePrompt
         </button>
       </div>
 
-      <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl border border-slate-800">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold flex items-center gap-3">
-                <span className="p-2 bg-blue-500/20 rounded-xl text-blue-400">✨</span>
-                Executive Intelligence
-              </h2>
-              {isSynthesizing && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full animate-pulse font-black uppercase tracking-widest">Synthesizing...</span>}
-            </div>
-            
-            <form onSubmit={(e) => { e.preventDefault(); onUpdatePrompt(localPrompt); }} className="relative">
-              <input 
-                value={localPrompt}
-                onChange={(e) => setLocalPrompt(e.target.value)}
-                placeholder="What should I look for in the data?"
-                className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
-              />
-              <button className="absolute right-2 top-2 bottom-2 bg-blue-600 px-6 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors">Analyze</button>
-            </form>
-
-            <div className="text-slate-400 leading-relaxed text-sm h-32 overflow-y-auto scrollbar-hide">
-              {analysis?.executiveNarrative || "Generating narrative..."}
-            </div>
-          </div>
-
-          <div className="border-l border-slate-800 pl-8 space-y-6">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Strategic Signals</h3>
-            <div className="space-y-3">
-              {analysis?.topFeatures.map((f, i) => (
-                <div key={i} className="bg-slate-800/30 p-4 rounded-2xl border border-slate-700/50">
-                  <h4 className="text-xs font-bold text-white mb-1">{f.title}</h4>
-                  <div className="flex gap-1">
-                    {[...Array(5)].map((_, j) => <div key={j} className={`h-1 flex-1 rounded-full ${j < (f.impactScore/20) ? 'bg-blue-500' : 'bg-slate-700'}`}></div>)}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* Executive Summary */}
+      {customerSummaries && (
+        <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white shadow-2xl border border-slate-800">
+          <h2 className="text-xl font-bold flex items-center gap-3 mb-6">
+            <span className="p-2 bg-blue-500/20 rounded-xl text-blue-400">✨</span>
+            Executive Summary
+          </h2>
+          <div className="text-slate-300 leading-relaxed text-sm whitespace-pre-wrap">
+            {customerSummaries.overall}
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <KpiCard label="Sentiment Score" value={`${stats?.avgSent}%`} sub="Across All Segments" />
-        <KpiCard label="Pipeline Value" value={`$${stats?.totalValue.toLocaleString()}`} sub="Aggregated Potential" />
-        <KpiCard label="Churn Risk" value={`${stats?.avgRisk}%`} sub="Systemic Warning" />
-      </div>
+      {/* SWOT Grid */}
+      {customerSummaries && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <SummaryCard title="Strengths" content={customerSummaries.strengths} color="green" />
+          <SummaryCard title="Weaknesses" content={customerSummaries.weaknesses} color="red" />
+          <SummaryCard title="Opportunities" content={customerSummaries.opportunities} color="blue" />
+          <SummaryCard title="Threats" content={customerSummaries.threats} color="amber" />
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 h-80">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Segment Distribution</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <PieChart>
-              <Pie data={stats?.pieData} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} cornerRadius={8} paddingAngle={5}>
-                {stats?.pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+      {/* Features Requested */}
+      {customerSummaries && (
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-black text-purple-600 uppercase tracking-widest mb-4">Features Requested</h3>
+          <div className="text-slate-600 leading-relaxed text-sm whitespace-pre-wrap">
+            {customerSummaries.features_requested}
+          </div>
         </div>
-        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 h-80">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Sentiment Trend</h3>
-          <ResponsiveContainer width="100%" height="90%">
-            <AreaChart data={data.map(d => ({ v: d.metrics.customerSentiment }))}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <Tooltip />
-              <Area type="monotone" dataKey="v" stroke="#3b82f6" fill="#3b82f610" strokeWidth={3} />
-            </AreaChart>
-          </ResponsiveContainer>
+      )}
+
+      {!customerSummaries && (
+        <div className="bg-slate-100 rounded-[2.5rem] p-10 text-center">
+          <p className="text-slate-500">Click "Sync Data" to generate customer insight summaries from your Google Sheet.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 };
 
-const KpiCard = ({ label, value, sub }: any) => (
-  <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-3xl font-black text-slate-900 mb-1">{value}</p>
-    <p className="text-[10px] text-slate-400 font-bold">{sub}</p>
-  </div>
-);
+const SummaryCard = ({ title, content, color }: { title: string; content: string; color: string }) => {
+  const colorClasses: Record<string, string> = {
+    green: 'text-green-600 bg-green-50 border-green-200',
+    red: 'text-red-600 bg-red-50 border-red-200',
+    blue: 'text-blue-600 bg-blue-50 border-blue-200',
+    amber: 'text-amber-600 bg-amber-50 border-amber-200',
+  };
+  const titleColor: Record<string, string> = {
+    green: 'text-green-700',
+    red: 'text-red-700',
+    blue: 'text-blue-700',
+    amber: 'text-amber-700',
+  };
+
+  return (
+    <div className={`p-6 rounded-[2rem] border shadow-sm ${colorClasses[color]}`}>
+      <h3 className={`text-xs font-black uppercase tracking-widest mb-3 ${titleColor[color]}`}>{title}</h3>
+      <div className="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">
+        {content}
+      </div>
+    </div>
+  );
+};
 
 export default Dashboard;
